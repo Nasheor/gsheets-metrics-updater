@@ -12,7 +12,7 @@ In this case -
 ###### How this works
 
 1. The script queries the  `Teamwork Projects` API and retrieves info about `Number of bugs generated in the last 7 days`
-2. Accesses the Google sheet and finds the row with the description `Number of bugs generated in the last 7 days` 
+2. Accesses the Google sheet of the user and finds the row with the description `Number of bugs generated in the last 7 days` 
 3. Creates a column that is the current week number from the start of the year, if not already present. 
 4. Updates that row and column with the `Number of bugs generated in the last 7 days`
 
