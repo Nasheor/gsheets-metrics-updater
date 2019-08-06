@@ -1,0 +1,2 @@
+language: go
+// Configuring the rules for travis to pick up
