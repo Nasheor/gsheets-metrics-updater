@@ -53,10 +53,9 @@ More information on `GOPATH` can be found [here](https://golang.org/doc/install#
 
 1. In order to be able to access the spreadsheet, youre google account should have already been given access to this Google Sheet. 
 2. Navigate to the following [link](https://developers.google.com/sheets/api/quickstart/go) and enable _Google Sheets API_ 
-3. Download `Client secret configuration` from the pop up and save to the directory where the script is present
-4. Place the API token of `Teamwork Projects` in the file `accesstoken.txt` 
+3. Download `Client secret configuration` from the pop up and save to the folder `authentication`
+4. Place the API token of `Teamwork Projects` in the file `accesstoken.txt` inside `authentication` folder
 5. Once this is done follow the instructions from the script after running it.
-
 
 ## Running The Script
 
