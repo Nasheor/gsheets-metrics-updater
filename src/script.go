@@ -63,7 +63,7 @@ func getEndPoint(fromDate, toDate string) string {
 func getDataFromEndpoint(endpoint string) Data {
 	// Setting the type of request and authorization data
 	req, err := http.NewRequest("GET", endpoint, nil)
-	token, _ := ioutil.ReadFile("authentication/accesstoken.txt")
+	token, _ := ioutil.ReadFile("../authentication/accesstoken.txt")
 	encodedToken := base64.StdEncoding.EncodeToString([]byte(string(token)))
 	basicAuth := "Basic " + encodedToken
 	req.Header.Set("Authorization", basicAuth)
@@ -194,7 +194,7 @@ func createMeasurable(data [][]interface{}, measurableData string) [][]interface
 
 //Writes to the Frontend or Backend scorecard
 func writeToScoreCard(team string, bugs int) {
-	b, err := ioutil.ReadFile("authentication/credentials.json")
+	b, err := ioutil.ReadFile("../authentication/credentials.json")
 	if err != nil {
 		log.Fatalf("Unable to read client secret file: %v", err)
 	}
