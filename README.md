@@ -31,7 +31,8 @@ First and foremost you need to have your Go Development environment setup i.e., 
 2. Set your environment variable __GOROOT__ to point to _Go_ folder
 3. Create a new environment variable __GOPATH__ to point to the folder where you want to store your Go Projects. For the sake of this     tutorial, lets name this folder _Go Projects_. So, your __GOPATH__ should point to the folder _Go Projects_.
 4. Navigate into _Go Projects_ and create a folder _src_. Inside _src_ is where all your projects will be stored.
-5. Navigate into _src_ and create a folder _github.com_. The reason for this is _go_ requires you to set up your development environment categorically depending upon the source of the project
+5. Navigate into _src_ and create a folder _github.com_. The reason for this is, the go community recommends you to set up your development environment categorically depending upon the source of the project
+6. Navigate into _github.com_ and clone this repository __gsheets-metrics-updater__
 
 ## What is GOROOT and GOPATH
 ###### GOROOT
@@ -59,9 +60,8 @@ More information on `GOPATH` can be found [here](https://golang.org/doc/install#
 
 ## Running The Script
 
-1. Navigate into _github.com_ and clone this repository __gsheets-metrics-updater__
-2. Now open a terminal inside __gsheets-metrics-updater__ and type `brew install dep` if on mac or `go get -u github.com/golang/dep/cmd/dep` for windows
-3. `dep`is a dependency management tool similar to `npm` but for Go
-4. If you're on windows, add `dep` to your global path
-5. Open a terminal inside __gsheets-metrics-updater__ and type `dep ensure -v`
-6. Now type `go run *.go`
+1. Now open a terminal inside __gsheets-metrics-updater__ and type `brew install dep` if on mac or `go get -u github.com/golang/dep/cmd/dep` for windows
+2. `dep`is a dependency management tool similar to `npm` but for Go
+3. If you're on windows, add `dep` to your global path
+4. Open a terminal inside __gsheets-metrics-updater__ and type `dep ensure -v`
+5. Now type `go run *.go`
