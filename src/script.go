@@ -44,7 +44,7 @@ func getEndPoint(fromDate, toDate string) string {
 	params := url.Values{}
 
 	params.Add("includeBlockedTasks", "true")
-	params.Add("ignoreStartDates", "false")
+	params.Add("include", "taskListNames")
 	params.Add("includeCompletedTasks", "true")
 	params.Add("tagIds", "3871")
 	params.Add("onlyUntaggedTasks", "false")
@@ -52,7 +52,6 @@ func getEndPoint(fromDate, toDate string) string {
 	params.Add("matchAllExcludedTags", "false")
 	params.Add("createdAfterDate", fromDate)
 	params.Add("createdBeforeDate", toDate)
-	params.Add("createdFilter", "custom")
 
 	//Adding the query params to the base url
 	endpoint.RawQuery = params.Encode()
@@ -63,7 +62,7 @@ func getEndPoint(fromDate, toDate string) string {
 func getDataFromEndpoint(endpoint string) Data {
 	// Setting the type of request and authorization data
 	req, err := http.NewRequest("GET", endpoint, nil)
-	token, _ := ioutil.ReadFile("../authentication/accesstoken.txt")
+	token, _ := ioutil.ReadFile("accesstoken.txt")
 	encodedToken := base64.StdEncoding.EncodeToString([]byte(string(token)))
 	basicAuth := "Basic " + encodedToken
 	req.Header.Set("Authorization", basicAuth)
@@ -86,12 +85,23 @@ func getDataFromEndpoint(endpoint string) Data {
 
 //Counting the number of tags with a particular tag name
 func getBugsCount(team string, data Data) int {
+	taskListNames := []int{1137238, 1138697}
 	count := 0
+	validTagPresent := false
 	for i := range data.Tasks {
+		validTagPresent = false
 		task := data.Tasks[i]
 		for j := range task.Tags {
 			tag := task.Tags[j]
 			if tag.Name == team {
+				count = count + 1
+				validTagPresent = true
+			}
+		}
+		if !validTagPresent {
+			if task.TaskListID == taskListNames[0] && team == "frontend" {
+				count = count + 1
+			} else if task.TaskListID == taskListNames[1] && team == "backend" {
 				count = count + 1
 			}
 		}
@@ -136,7 +146,6 @@ func isCurrentWeekPresent(firstRow []interface{}) bool {
 	return isWeekPresent
 }
 
-// Creates the respective week number (current weeek from the start of the year)
 func createWeekInScorecard(data [][]interface{}) [][]interface{} {
 	newData := make([][]interface{}, 30)
 	breakpoint := -1
@@ -166,7 +175,6 @@ func createWeekInScorecard(data [][]interface{}) [][]interface{} {
 	return data
 }
 
-// If the measruable "Number of bugs" isn't already present, create the measurable
 func createMeasurable(data [][]interface{}, measurableData string) [][]interface{} {
 	measurable := []interface{}{" ", measurableData, "0%", "0", "0.00%", " ", " ", " ", " ", " "}
 	if isCurrentWeekPresent(data[0]) {
@@ -194,7 +202,7 @@ func createMeasurable(data [][]interface{}, measurableData string) [][]interface
 
 //Writes to the Frontend or Backend scorecard
 func writeToScoreCard(team string, bugs int) {
-	b, err := ioutil.ReadFile("../authentication/credentials.json")
+	b, err := ioutil.ReadFile("credentials.json")
 	if err != nil {
 		log.Fatalf("Unable to read client secret file: %v", err)
 	}
@@ -293,6 +301,6 @@ func main() {
 	fmt.Println("Writing to Frontend Scorecard")
 	writeToScoreCard("frontend", frontEndBugs)
 	fmt.Println("Frontend scorecard updated")
-	fmt.Println("Writing to Backend Scorecard")
-	writeToScoreCard("backend", backEndBugs)
+	// fmt.Println("Writing to Backend Scorecard")
+	// writeToScoreCard("backend", backEndBugs)
 }
