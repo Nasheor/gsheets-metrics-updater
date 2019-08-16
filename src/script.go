@@ -16,6 +16,8 @@ import (
 	"google.golang.org/api/sheets/v4"
 )
 
+var column []string
+
 // Prints the number of frontend bugs, backend bugs and bugs yet to be classified
 func printBugsStats(frontEndBugs int, backEndBugs int, totalBugs int) {
 	fmt.Println("Number of Frontend bugs: ", frontEndBugs)
@@ -47,7 +49,6 @@ func getEndPoint(fromDate, toDate string) string {
 	params.Add("include", "taskListNames")
 	params.Add("includeCompletedTasks", "true")
 	params.Add("tagIds", "3871")
-	params.Add("onlyUntaggedTasks", "false")
 	params.Add("matchAllTags", "true")
 	params.Add("matchAllExcludedTags", "false")
 	params.Add("createdAfterDate", fromDate)
@@ -115,13 +116,97 @@ func getScorecardInfo(team string) (string, string) {
 	spreadsheetID := ""
 	measurable := ""
 	if team == "frontend" {
-		spreadsheetID = "1igV-OBcSFOj6MrNMtsxKYht56_7WeHnXOUMp9Acs-Bs"
-		measurable = "Number of bugs generated for frontened in the last 7 days"
+		spreadsheetID = "Frontend Sheet Identifier"
+		measurable = "Number of bugs generated in the last 7 days"
 	} else {
-		spreadsheetID = "1igV-OBcSFOj6MrNMtsxKYht56_7WeHnXOUMp9Acs-Bs"
-		measurable = "Number of bugs generated for backend in the last 7 days"
+		spreadsheetID = "Backend Sheet Identifier"
+		measurable = "Number of bugs generated in the last 7 days"
 	}
 	return spreadsheetID, measurable
+}
+
+//Check if the measurable is present in the scorecard
+func checkMeasurablePresent(data [][]interface{}, measurable string) bool {
+	isMeasurablePresent := false
+	for _, row := range data {
+		for _, cell := range row {
+			if cell == measurable {
+				isMeasurablePresent = true
+				break
+			}
+		}
+	}
+	return isMeasurablePresent
+}
+
+//Create missing data in the scorecard i.e., current week or measurable or both
+func createData(client *http.Client, dataToWrite string, identifier string, data [][]interface{}, spreadsheetID string, sheetID int) {
+	srv, _ := sheets.New(client)
+	startIndex := -1
+	endIndex := -1
+	var majorDimension string
+
+	// Deciding where to insert the empty row or column based on the row or column identifier
+	for rowIndex, row := range data {
+		for columnIndex, item := range row {
+			if identifier == "Total healthscore" && item == identifier {
+				startIndex = rowIndex
+				endIndex = rowIndex + 1
+				majorDimension = "ROWS"
+				break
+			} else if identifier == "Result" && item == identifier {
+				startIndex = columnIndex + 1
+				endIndex = columnIndex + 2
+				majorDimension = "COLUMNS"
+				break
+			}
+		}
+		if startIndex != -1 {
+			break
+		}
+	}
+
+	// Inserting the row or column
+	var idr sheets.InsertDimensionRequest
+	var r sheets.Request
+	var d sheets.DimensionRange
+
+	d.SheetId = int64(sheetID)
+	d.Dimension = majorDimension
+	d.EndIndex = int64(endIndex)
+	d.StartIndex = int64(startIndex)
+
+	idr.Range = &d
+
+	r.InsertDimension = &idr
+
+	requests := []*sheets.Request{&r}
+
+	rb := &sheets.BatchUpdateSpreadsheetRequest{
+		Requests: requests,
+	}
+	_, err := srv.Spreadsheets.BatchUpdate(spreadsheetID, rb).Do()
+
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	var writeRange string
+	var tmp []interface{}
+	if majorDimension == "ROWS" {
+		writeRange = "A" + strconv.Itoa(startIndex+1) + ":Z" + strconv.Itoa(endIndex)
+		tmp = []interface{}{" ", dataToWrite, "0%", "0", "0.00%", " ", " ", " ", " ", " "}
+	} else {
+		writeRange = column[startIndex] + "1:" + column[startIndex] + "2"
+		tmp = []interface{}{dataToWrite}
+	}
+	metrics := [][]interface{}{tmp}
+	var vr sheets.ValueRange
+	vr.MajorDimension = majorDimension
+	vr.Range = writeRange
+	vr.Values = metrics
+
+	_, err = srv.Spreadsheets.Values.Update(spreadsheetID, writeRange, &vr).ValueInputOption("RAW").ResponseValueRenderOption("FORMATTED_VALUE").Do()
 }
 
 //Get the week number from the start of the year
@@ -131,14 +216,13 @@ func getCurrentWeekNumber() int {
 	return week
 }
 
+// Flags true if the current week number is already present in the scorecard
 func isCurrentWeekPresent(firstRow []interface{}) bool {
-
-	// Flags true if the current week number is already present in the scorecard
 	isWeekPresent := false
-
+	weekNumber := getCurrentWeekNumber()
 	for _, element := range firstRow {
 		parsedElement, _ := strconv.Atoi(fmt.Sprintf("%v", element))
-		if parsedElement == getCurrentWeekNumber() {
+		if parsedElement == weekNumber {
 			isWeekPresent = true
 			break
 		}
@@ -146,62 +230,41 @@ func isCurrentWeekPresent(firstRow []interface{}) bool {
 	return isWeekPresent
 }
 
-func createWeekInScorecard(data [][]interface{}) [][]interface{} {
-	newData := make([][]interface{}, 30)
-	breakpoint := -1
-
-	if !isCurrentWeekPresent(data[0]) {
-		for rowIndex, row := range data {
-			for columnIndex, item := range row {
-				if item == "Result" {
-					j := columnIndex
-					breakpoint = j + 1
-				}
-				if breakpoint == columnIndex || breakpoint == len(row) {
-					newRowData := append(make([]interface{}, 0), data[rowIndex][:breakpoint]...)
-					if rowIndex == 0 {
-						newRowData = append(newRowData, getCurrentWeekNumber())
-					} else {
-						newRowData = append(newRowData, 0)
-					}
-					newRowData = append(newRowData, data[rowIndex][breakpoint:]...)
-					newData[rowIndex] = newRowData
-					break
-				}
-			}
-		}
-		return newData
-	}
-	return data
-}
-
-func createMeasurable(data [][]interface{}, measurableData string) [][]interface{} {
-	measurable := []interface{}{" ", measurableData, "0%", "0", "0.00%", " ", " ", " ", " ", " "}
-	if isCurrentWeekPresent(data[0]) {
-		measurable = []interface{}{" ", measurableData, "0%", "0", "0.00%", "0", " ", " ", " ", " ", " "}
-	}
-	dataWithMeasurable := make([][]interface{}, 50)
-	count := 0
-	measurablePresent := false
+// Updates the scorecard with the bugs count
+func updateScoreCard(client *http.Client, bugs int, data [][]interface{}, spreadsheetID string) {
+	srv, _ := sheets.New(client)
+	var c string
 	for _, row := range data {
-		if count == (len(data) - 2) {
-			dataWithMeasurable[count] = row
-			dataWithMeasurable[count+1] = measurable
-			measurablePresent = true
-		} else {
-			if measurablePresent {
-				dataWithMeasurable[len(data)] = row
-			} else {
-				dataWithMeasurable[count] = row
+		for columnIndex, item := range row {
+			if item == strconv.Itoa(getCurrentWeekNumber()) {
+				c = column[columnIndex]
+				break
 			}
 		}
-		count++
+		if len(c) > 1 {
+			break
+		}
 	}
-	return dataWithMeasurable
+
+	index := len(data) - 1
+	writeRange := c + strconv.Itoa(index)
+	tmp := []interface{}{bugs}
+	weeklyBugs := [][]interface{}{tmp}
+	var vr sheets.ValueRange
+	vr.MajorDimension = "COLUMNS"
+	vr.Range = writeRange
+	vr.Values = weeklyBugs
+
+	_, err := srv.Spreadsheets.Values.Update(spreadsheetID, writeRange, &vr).ValueInputOption("RAW").ResponseValueRenderOption("FORMATTED_VALUE").Do()
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println("Scorecard updated at ", writeRange)
+
 }
 
 //Writes to the Frontend or Backend scorecard
-func writeToScoreCard(team string, bugs int) {
+func writeToScoreCard(team string, bugs int, sheetID int) {
 	b, err := ioutil.ReadFile("credentials.json")
 	if err != nil {
 		log.Fatalf("Unable to read client secret file: %v", err)
@@ -228,57 +291,39 @@ func writeToScoreCard(team string, bugs int) {
 	}
 
 	// Holds the current data present in the spreadsheet
-	rawData := resp.Values
-	var vr sheets.ValueRange
+	data := resp.Values
+	column = []string{"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"}
+	isMeasurablePresent := checkMeasurablePresent(data, measurable)
+	var identifier string
 
-	isMeasurablePresent := false
-	for _, row := range rawData {
-		for _, cell := range row {
-			if cell == measurable {
-				isMeasurablePresent = true
-				break
-			}
-		}
-	}
-	dataToWrite := rawData
 	if !isMeasurablePresent {
 		fmt.Println("Measurable: '", measurable, "' not present. Creating measurable now...")
-		dataToWrite = createMeasurable(dataToWrite, measurable)
+		identifier = "Total healthscore"
+		createData(client, measurable, identifier, data, spreadsheetID, sheetID)
 		fmt.Println("Measurable Created")
 	} else {
 		fmt.Println("Measurable already present")
 	}
-	if !isCurrentWeekPresent(dataToWrite[0]) {
-		fmt.Println("Creating Current week: ", getCurrentWeekNumber())
-		dataToWrite = createWeekInScorecard(dataToWrite)
+
+	currentWeek := strconv.Itoa(getCurrentWeekNumber())
+	if !isCurrentWeekPresent(data[0]) {
+		identifier = "Result"
+		fmt.Println("Creating Current week: ", currentWeek)
+		createData(client, currentWeek, identifier, data, spreadsheetID, sheetID)
 		fmt.Println("Current week created")
 	} else {
-		fmt.Println("Week already present")
+		fmt.Println("Current Week: ", currentWeek, " already present")
 	}
+	fmt.Println("Updating Scorecard...")
+	resp, err = srv.Spreadsheets.Values.Get(spreadsheetID, "A1:Z100").Do()
+	data = resp.Values
 
-	for rowIndex, row := range dataToWrite {
-		for _, item := range row {
-			if item == measurable {
-				dataToWrite[rowIndex][5] = bugs
-				break
-			}
-
-		}
-	}
-	writeRange := "A1"
-	vr.Values = dataToWrite[:(len(dataToWrite) - 1)]
-	_, err = srv.Spreadsheets.Values.Update(spreadsheetID, writeRange, &vr).ValueInputOption("RAW").ResponseValueRenderOption("UNFORMATTED_VALUE").Do()
-
-	writeRange = "A" + strconv.Itoa(len(dataToWrite))
-
-	vr.Values = dataToWrite[(len(dataToWrite) - 1):]
-	_, err = srv.Spreadsheets.Values.Update(spreadsheetID, writeRange, &vr).ValueInputOption("RAW").Do()
-
+	updateScoreCard(client, bugs, data, spreadsheetID)
 }
 
 func main() {
 
-	//Getting the current date and seperating the day of month, month and year
+	// Getting the current date and seperating the day of month, month and year
 	currentDateTime := time.Now()
 	fromDateTime := currentDateTime.AddDate(0, 0, -7)
 	currentYear, currentMonth, currentDayOfMonth := getYearMonthDay(currentDateTime)
@@ -295,12 +340,12 @@ func main() {
 	backEndBugs := getBugsCount("backend", data)
 	totalBugs := len(data.Tasks)
 
-	fmt.Println("Total Bugs: ", totalBugs)
-	fmt.Println("Number of Frontend bugs: ", frontEndBugs)
-	fmt.Println("Number of Backend bugs: ", backEndBugs)
+	fmt.Println("Total Bugs in the last 7 days: ", totalBugs)
+	fmt.Println("Number of Frontend bugs in the last 7 days: ", frontEndBugs)
+	fmt.Println("Number of Backend bugs in the last 7 days: ", backEndBugs)
 	fmt.Println("Writing to Frontend Scorecard")
-	writeToScoreCard("frontend", frontEndBugs)
+	writeToScoreCard("frontend", frontEndBugs, 11111111)
 	fmt.Println("Frontend scorecard updated")
-	// fmt.Println("Writing to Backend Scorecard")
-	// writeToScoreCard("backend", backEndBugs)
+	fmt.Println("Writing to Backend Scorecard")
+	writeToScoreCard("backend", backEndBugs, 111111111)
 }
