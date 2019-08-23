@@ -1,67 +1,43 @@
 package main
 
-import (
-	"encoding/json"
-	"fmt"
-	"log"
-	"net/http"
-	"os"
-
-	"golang.org/x/net/context"
-	"golang.org/x/oauth2"
-)
-
-// Retrieve a token, saves the token, then returns the generated client.
-func getClient(config *oauth2.Config) *http.Client {
-	// The file token.json stores the user's access and refresh tokens, and is
-	// created automatically when the authorization flow completes for the first
-	// time.
-	tokFile := "token.json"
-	tok, err := tokenFromFile(tokFile)
-	if err != nil {
-		tok = getTokenFromWeb(config)
-		saveToken(tokFile, tok)
-	}
-	return config.Client(context.Background(), tok)
+// Data holds the parent data attributes returned from the API
+type Data struct {
+	Status    string     `json:"STATUS"`
+	Tasks     []Task     `json:"tasks"`
+	TaskLists []TaskList `json:"taskLists"`
+	Projects  []Project  `json:"projects"`
 }
 
-// Request a token from the web, then returns the retrieved token.
-func getTokenFromWeb(config *oauth2.Config) *oauth2.Token {
-	authURL := config.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
-	fmt.Printf("Go to the following link in your browser then copy the "+
-		"authorization code: \n%v\n", authURL)
-	fmt.Println("Paste the authorization code right below this: ")
-	var authCode string
-	if _, err := fmt.Scan(&authCode); err != nil {
-		log.Fatalf("Unable to read authorization code: %v", err)
-	}
-
-	tok, err := config.Exchange(context.TODO(), authCode)
-	if err != nil {
-		log.Fatalf("Unable to retrieve token from web: %v", err)
-	}
-	return tok
+// Project holds information about the project from which data is fetched from
+type Project struct {
+	ID          int64  `json:"id"`
+	Name        string `json:"name"`
+	Status      string `json:"status"`
+	CompanyID   int64  `json:"companyId"`
+	CompanyName string `json:"companyName"`
 }
 
-// Retrieves a token from a local file.
-func tokenFromFile(file string) (*oauth2.Token, error) {
-	f, err := os.Open(file)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	tok := &oauth2.Token{}
-	err = json.NewDecoder(f).Decode(tok)
-	return tok, err
+//TaskList holds information about task lists from which the tasks are from
+type TaskList struct {
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
 }
 
-// Saves a token to a file path.
-func saveToken(path string, token *oauth2.Token) {
-	fmt.Printf("Saving credential file to: %s\n", path)
-	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
-	if err != nil {
-		log.Fatalf("Unable to cache oauth token: %v", err)
-	}
-	defer f.Close()
-	json.NewEncoder(f).Encode(token)
+// Task holds information about the task
+type Task struct {
+	ID          int64       `json:"id,omitempty"`
+	Name        string      `json:"name,omitempty"`
+	DateCreated string      `json:"dateCreated,omitempty"`
+	DateChanged string      `json:"dateChanged,omitempty"`
+	ProjectID   int         `json:"projectId,omitempty"`
+	StartDate   interface{} `json:"startDate"`
+	Tags        []Tag       `json:"tags"`
+	DueDate     interface{} `json:"dueDate"`
+	TaskListID  int         `json:"taskListId,omitempty"`
+}
+
+// Tag holds information about the tag but the only tags we care about are "frontend", "backend" and "bug"
+type Tag struct {
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
 }
